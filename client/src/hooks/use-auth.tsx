@@ -4,6 +4,10 @@ import { useLocation } from "wouter";
 export interface User {
   id: string;
   username: string;
+  displayName?: string | null;
+  avatarUrl?: string | null;
+  email?: string | null;
+  authProvider?: string | null;
 }
 
 interface AuthContextType {
@@ -11,10 +15,22 @@ interface AuthContextType {
   isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
+  googleLogin: () => void;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+function normalizeUser(data: any): User {
+  return {
+    id: data.id,
+    username: data.username,
+    displayName: data.displayName ?? null,
+    avatarUrl: data.avatarUrl ?? null,
+    email: data.email ?? null,
+    authProvider: data.authProvider ?? null,
+  };
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -25,7 +41,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     fetch("/api/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
-        if (data) setUser(data);
+        if (data) setUser(normalizeUser(data));
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -37,9 +53,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
-    setUser(data);
+
+    setUser(normalizeUser(data));
     setLocation("/");
   };
 
@@ -49,10 +67,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
+
     const data = await res.json();
     if (!res.ok) throw new Error(data.message);
-    setUser(data);
+
+    setUser(normalizeUser(data));
     setLocation("/");
+  };
+
+  const googleLogin = () => {
+    window.location.href = "/api/auth/google";
   };
 
   const logout = async () => {
@@ -62,7 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, register, logout }}>
+    <AuthContext.Provider
+      value={{ user, isLoading, login, register, googleLogin, logout }}
+    >
       {children}
     </AuthContext.Provider>
   );
